@@ -2,9 +2,8 @@
 * Attention: cant use the same key on multiple repos! -> need a new key for each repo
 
 1) Create Key:
-```bash
 ssh-keygen -t ed25519 -C "deploy-mysuperapp" -f ~/.ssh/deploy_mysuperapp
-```
+
 this creates "deploy_mysuperapp" (private key) and "deploy_mysuperapp.pub" (public key)
 
 2) add the a host alias to `~/.ssh/config`: this is required to use the correct key per repo
