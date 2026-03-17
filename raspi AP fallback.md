@@ -138,6 +138,28 @@ To adjust the wait time, change the loop parameters in the script:
 
 ---
 
+## 4. Commandline Wifi Management with NetworkManager: nmcli
+
+scan networks in range: 
+```bash
+sudo nmcli device wifi list
+```
+
+connect to new wifi:
+```bash
+sudo nmcli device wifi connect "SSID" password "wifipassword"
+```
+
+list configured networks: 
+```bash
+nmcli connection show
+```
+
+add wifi without connecting: 
+```bash
+sudo nmcli connection add type wifi ssid "SSID" -- wifi-sec.key-mgmt wpa-psk wifi-sec.psk "wifipassword"
+```
+
 ## Notes
 
 - SSH gateway IP when connected to the AP: `10.42.0.1`
