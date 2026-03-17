@@ -28,21 +28,7 @@ sudo reboot
 
 ## 2. Disable swap
 
-Swap on SD card = bad. Disable it permanently.
-
-```bash
-sudo dphys-swapfile swapoff
-sudo dphys-swapfile uninstall
-sudo systemctl disable dphys-swapfile
-```
-
-Verify:
-
-```bash
-free -h   # Swap line should show 0
-```
-
----
+no need - raspibian doesn´t swap to ssd.
 
 ## 3. Mount volatile directories as tmpfs
 
