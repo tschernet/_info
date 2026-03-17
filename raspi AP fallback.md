@@ -1,35 +1,36 @@
-# Raspberry Pi WiFi AP Fallback
-## Automatic access point when no WiFi connection is available
+# Raspberry Pi WiFi AP Fallback (nmcli variant)
+## Lightweight automatic access point when no WiFi connection is available
 
-**Use case:** Headless Pi appliance that connects to a known WiFi network in normal operation. If no connection is established within 2 minutes of boot, it falls back to a local access point for configuration — useful for first-time deployment or on-site WiFi setup.
+**Use case:** Headless Pi appliance that connects to a known WiFi network in normal operation. If no connection is established within 2 minutes of boot, it falls back to an open access point for SSH access and manual configuration.
 
 **Tested on:** Raspberry Pi Zero 2 W, Raspberry Pi OS Lite (Bookworm)
 
+**Advantage over RaspAP:** No extra software needed — uses NetworkManager which is already present on Raspberry Pi OS.
+
 > ⚠️ **AP+STA mode caveat:** The Pi Zero 2 W has a single WiFi chip. Running AP and client mode simultaneously on one radio works but can be flaky. Test on the bench before deploying on-site.
 
----
-
-## 1. Install RaspAP
-
-```bash
-curl -sL https://install.raspap.com | bash
-```
-
-This installs:
-- A WiFi AP (default SSID: `raspi-webgui`, password: `ChangeMe`)
-- Web configuration UI at `http://10.3.141.1`
-- DHCP server for AP clients
-
-After installation, **stop and disable RaspAP for now** — the fallback script will start it on demand:
-
-```bash
-sudo systemctl stop raspapd
-sudo systemctl disable raspapd
-```
+> ⚠️ **Open AP:** No password — intended for temporary configuration access only, not permanent operation.
 
 ---
 
-## 2. Create the fallback script
+## Prerequisites
+
+Verify NetworkManager is running and managing wlan0:
+
+```bash
+systemctl status NetworkManager
+nmcli device status
+```
+
+`wlan0` should appear in the nmcli output. If NetworkManager is not present:
+
+```bash
+sudo apt install network-manager
+```
+
+---
+
+## 1. Create the fallback script
 
 ```bash
 sudo nano /usr/local/bin/wifi-fallback.sh
@@ -49,9 +50,9 @@ for i in $(seq 1 24); do
     sleep 5
 done
 
-# No connection after 2 minutes — start RaspAP
-echo "No WiFi found after 2 minutes, starting AP fallback"
-systemctl start raspapd
+# No connection after 2 minutes — start open config AP
+echo "No WiFi found after 2 minutes, starting config AP"
+nmcli device wifi hotspot ifname wlan0 ssid kumm-config password ""
 ```
 
 Make it executable:
@@ -62,7 +63,7 @@ sudo chmod +x /usr/local/bin/wifi-fallback.sh
 
 ---
 
-## 3. Create the systemd service
+## 2. Create the systemd service
 
 ```bash
 sudo nano /etc/systemd/system/wifi-fallback.service
@@ -92,42 +93,36 @@ sudo systemctl enable wifi-fallback.service
 
 ---
 
-## 4. Usage
+## 3. Usage
 
 ### Normal operation
-Pi connects to known WiFi → fallback script exits cleanly → RaspAP stays off → no AP visible.
+Pi connects to known WiFi → fallback script exits cleanly → no AP visible.
 
 ### No WiFi available (first deployment / unknown network)
 After 2 minutes with no connection:
-1. RaspAP starts
-2. AP appears as `raspi-webgui`
-3. Connect from phone or laptop (password: `ChangeMe`)
-4. Open browser → `http://10.3.141.1`
-5. Configure client WiFi to point at the local network
-6. Reboot Pi → now connects normally
+1. Open AP appears as `kumm-config` (no password)
+2. Connect from phone or laptop
+3. SSH in: `ssh kumm@10.42.0.1`
+4. Edit `/etc/wpa_supplicant/wpa_supplicant.conf` or use `nmcli` to add the new network:
+```bash
+sudo nmcli device wifi connect "SSID" password "wifipassword"
+```
+5. Reboot → Pi connects normally
+
+### Manually trigger the AP (without rebooting)
+```bash
+sudo nmcli device wifi hotspot ifname wlan0 ssid kumm-config password ""
+```
+
+### Turn off the AP manually
+```bash
+sudo nmcli connection down Hotspot
+```
 
 ### Check fallback status
 ```bash
 journalctl -u wifi-fallback.service
-systemctl status raspapd
 ```
-
----
-
-## 5. Post-deployment cleanup (optional)
-
-Once the Pi is permanently connected to the target WiFi, RaspAP can be removed to keep the system lean:
-
-```bash
-# Disable the fallback service
-sudo systemctl disable wifi-fallback.service
-
-# Remove RaspAP
-# Check RaspAP docs for current uninstall procedure:
-# https://docs.raspap.com
-```
-
-Or leave it in place — handy if WiFi credentials change or the Pi moves to a new location.
 
 ---
 
@@ -141,12 +136,11 @@ To adjust the wait time, change the loop parameters in the script:
 | 24 | 5s | 2 minutes (default) |
 | 36 | 5s | 3 minutes |
 
-Or change the sleep interval — e.g. `sleep 10` with 12 iterations = 2 minutes with less CPU wakeups.
-
 ---
 
 ## Notes
 
-- RaspAP default credentials should be changed for anything beyond bench use — change SSID/password via the web UI after first login.
-- The fallback AP and the client WiFi share the same radio on Pi Zero 2 W — throughput and stability may be reduced while both are active simultaneously.
-- This setup plays nicely with the [appliance hardening guide](rpi-appliance-hardening.md) — the fallback script and service add negligible SD card writes.
+- SSH gateway IP when connected to the AP: `10.42.0.1`
+- SSID can be changed to anything — edit the script and the manual trigger command accordingly
+- This setup plays nicely with the [appliance hardening guide](rpi-appliance-hardening.md)
+- No extra packages required — NetworkManager is already present on Raspberry Pi OS Lite (Bookworm)
