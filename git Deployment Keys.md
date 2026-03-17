@@ -1,8 +1,10 @@
 * Deployment Key is a (usually read-only) access to a repo to deploy the software
 * Attention: cant use the same key on multiple repos! -> need a new key for each repo
 
-1) Create Key:
+# Create Key:
+'''
 ssh-keygen -t ed25519 -C "deploy-mysuperapp" -f ~/.ssh/deploy_mysuperapp
+'''
 
 this creates "deploy_mysuperapp" (private key) and "deploy_mysuperapp.pub" (public key)
 
